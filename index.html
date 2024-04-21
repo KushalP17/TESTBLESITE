@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 BLE App</title>
+    <style>
+        #grid {
+            display: grid;
+            grid-template-columns: repeat(32, 10px);
+            grid-template-rows: repeat(64, 10px);
+            gap: 1px;
+        }
+
+        .cell {
+            width: 10px;
+            height: 10px;
+            border: 1px solid #ccc;
+            cursor: pointer;
+            background-color: black;
+        }
+    </style>
+</head>
+<body>
+    <h1>ESP32 BLE App</h1>
+    <button onclick="connect()">Connect</button>
+    <button onclick="disconnect()">Disconnect</button>
+    <br>
+    <button onclick="writeValue(1)">Test Squiggle</button>
+    <br>
+    <button onclick="writeValue(2)">Mario Sprite</button>
+    <br>
+    <button onclick="writeValue(3)">Pacman</button>
+    <br>
+    <button onclick="writeValue(4)">Polka Dots</button>
+    <br>
+    <button onclick="writeValue(5)">Stickman</button>
+    <br>
+    <br>
+    <br>
+    <br>
+    <button onclick="writeValue(6)">Decrease Brightness</button>
+    <br>
+    <button onclick="writeValue(7)">Increase Brightness</button>
+    <br>
+    <!-- <button onclick="writeValue(256)">Test Button</button> -->
+    <br>
+    <br>
+    <br>
+    <br>
+
+
+    <input type="color" id="colorPicker" value="#ffffff">
+    <button onclick="activatePencil()">Pencil</button>
+    <button onclick="clearGrid()">Clear Grid</button>
+
+    <div id="grid"></div>
+
+
+    <script>
+        let device;
+        let characteristic;
+
+        async function connect() {
+            try {
+                device = await navigator.bluetooth.requestDevice({
+                    filters: [{ services: ['4fafc201-1fb5-459e-8fcc-c5c9c331914b'] }]
+                });
+
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService('4fafc201-1fb5-459e-8fcc-c5c9c331914b');
+                characteristic = await service.getCharacteristic('beb5483e-36e1-4688-b7f5-ea07361b26a8');
+
+                // Your code to interact with the characteristic goes here
+                // For example, reading/writing values or listening for notifications
+            } catch (error) {
+                console.error('Error connecting:', error);
+            }
+        }
+
+        function disconnect() {
+            if (device && device.gatt.connected) {
+                device.gatt.disconnect();
+            }
+        }
+
+        async function writeValue(x) {
+            if(characteristic && device.gatt.connected){            
+                try {
+                    //sleep(100);
+                    await characteristic.writeValue(new Uint8Array([x]));
+                    //sleep(100);
+                    console.log('Value of ' + x + ' written successfully');
+                    console.log(characteristic.getValue());
+                    
+                } catch (error) {
+                    console.error('Error writing:', error);
+                }
+            }else{
+                console.error('Device not connected or characteristic unavailable');
+            }
+        }
+
+        async function writePixel(row, col, R, G, B) {
+            if(characteristic && device.gatt.connected){            
+                try {
+                    //sleep(100);
+                    //let x = new Uint8Array([row, col, R, G, B]);
+                    await characteristic.writeValue(new Uint8Array([row, col, R, G, B]));
+                    //sleep(100);
+                    console.log('Value of ' + R + ', ' + G + ', ' + B + ' written successfully');
+                    console.log(characteristic.getValue());
+                    
+                } catch (error) {
+                    console.error('Error writing:', error);
+                }
+            }else{
+                console.error('Device not connected or characteristic unavailable');
+            }
+        }
+
+
+
+        let isPencilActive = false;
+        let isDrawing = false;
+        let selectedColor = '#ffffff';
+
+        function activatePencil() {
+            isPencilActive = true;
+            writeValue(8);
+        }
+
+        function clearGrid() {
+            const cells = document.querySelectorAll('.cell');
+            cells.forEach(cell => {
+                cell.style.backgroundColor = '#000000';
+            });
+            writeValue(0);
+        }
+
+        function createGrid() {
+            const grid = document.getElementById('grid');
+            for (let i = 0; i < 64; i++) {
+                for (let j = 0; j < 32; j++) {
+                    const cell = document.createElement('div');
+                    cell.setAttribute("col", j);
+                    cell.setAttribute("row", i);
+                    cell.classList.add('cell');
+                    cell.addEventListener('mousedown', handleCellMouseDown);
+                    cell.addEventListener('mouseover', handleCellHover);
+                    cell.addEventListener('touchstart', handleCellMouseDown);
+                    cell.addEventListener('touchmove', handleCellTouchMove);
+                    grid.appendChild(cell);
+                }
+            }
+            //document.addEventListener('mouseup', () => {
+            //    isDrawing = false;
+            //});
+        }
+
+        function handleCellMouseDown(event) {
+            //event.preventDefault();
+            if (isPencilActive) {
+                isDrawing = true;
+                handleCellClick(event);
+                //console.log("mouse is down @ ");
+            }
+        }
+
+        function drawPixel(row, col, color){
+            let R = color.substring(1, 3);
+            let G = color.substring(3, 5);
+            let B = color.substring(5, 7);
+
+            console.log(R);
+
+            R = parseInt(R, 16);
+            G = parseInt(G, 16);
+            B = parseInt(B, 16);
+
+            console.log(R);
+
+            writePixel(row, col, R, G, B);
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        function handleCellClick(event) {
+            if (isDrawing) {
+                const cell = event.target;
+                cell.style.backgroundColor = selectedColor;
+                console.log("cell drawn @ " + cell.getAttribute("row") + ", " + cell.getAttribute("col"));
+                drawPixel(cell.getAttribute("row"), cell.getAttribute("col"), selectedColor);
+                cell.addEventListener('mouseover', handleCellHover);
+                document.addEventListener('mouseup', () => {
+                    cell.removeEventListener('mouseover', handleCellHover);
+                    isDrawing = false;
+                });
+
+            }
+        }
+
+        function handleCellHover(event) {
+            event.preventDefault;
+            if (isDrawing) {
+                const cell = event.target;
+                console.log("cell drawn @ " + cell.getAttribute("row") + ", " + cell.getAttribute("col"));
+                drawPixel(cell.getAttribute("row"), cell.getAttribute("col"), selectedColor);
+                cell.style.backgroundColor = selectedColor;
+            }
+        }
+
+        function handleCellTouchMove(event) {
+            event.preventDefault();
+            if (isDrawing) {
+                const touches = event.changedTouches;
+                for (let i = 0; i < touches.length; i++) {
+                    const touch = touches[i];
+                    const cell = document.elementFromPoint(touch.clientX, touch.clientY);
+                    if (cell && cell.classList.contains('cell')) {
+                        drawPixel(cell.getAttribute("row"), cell.getAttribute("col"), selectedColor);
+                        cell.style.backgroundColor = selectedColor;
+                    }
+                }
+            }
+        }
+
+        function updateSelectedColor() {
+            selectedColor = document.getElementById('colorPicker').value;
+        }
+
+        // Initialize the grid when the page loads
+        window.onload = function () {
+            createGrid();
+            document.getElementById('colorPicker').addEventListener('input', updateSelectedColor);
+
+            document.addEventListener('touchmove', function(event) {
+                // Check if we are drawing and prevent scrolling
+                if (isDrawing) {
+                    event.preventDefault;
+                }
+
+                // Handle the touch move for each cell
+                const touches = event.targetTouches;
+                for (let i = 0; i < touches.length; i++) {
+                    handleCellHover(touches[i]);
+                }
+            });
+        };
+    </script>
+</body>
+</html>
