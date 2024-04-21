@@ -21,7 +21,11 @@
         async function connect() {
             try {
                 device = await navigator.bluetooth.requestDevice({
-                    filters: [{ services: [0xFFE0] }]
+                    filters: [
+                        {name: "KUSHAL"},
+                        {name: "ODAY"}, 
+                        { services: [0xFFE0] }
+                    ]
                 });
 
                 const server = await device.gatt.connect();
