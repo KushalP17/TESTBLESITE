@@ -25,8 +25,8 @@
                 });
 
                 const server = await device.gatt.connect();
-                const service = await server.getPrimaryService('4fafc201-1fb5-459e-8fcc-c5c9c331914b');
-                characteristic = await service.getCharacteristic('beb5483e-36e1-4688-b7f5-ea07361b26a8');
+                const service = await server.getPrimaryService(0xFFE0);
+                characteristic = await service.getCharacteristic(0xFFE1);
 
                 // Your code to interact with the characteristic goes here
                 // For example, reading/writing values or listening for notifications
